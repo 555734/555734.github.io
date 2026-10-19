@@ -1,0 +1,32 @@
+name: Publish developer website
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate and prepare static website
+        run: |
+          python3 -c "from pathlib import Path; assert Path('app-ads.txt').read_bytes() == b'google.com, pub-6772282664898856, DIRECT, f08c47fec0942fa0\n'"
+          mkdir _site
+          cp index.html app-ads.txt .nojekyll _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
