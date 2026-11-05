@@ -37,11 +37,11 @@ def download(url, path, size, digest):
         raise ValueError('Downloaded file checksum/size mismatch')
 
 
-def publish(tag, title, notes, files, root):
+def publish(tag, title, notes, files, root, rolling=False):
     view = gh('release', 'view', tag, '--json', 'isDraft', check=False)
     exists = view.returncode == 0
     draft = exists and json.loads(view.stdout)['isDraft']
-    if exists and not draft:
+    if exists and not draft and not rolling:
         print(f'Checking existing immutable release {tag}', flush=True)
     else:
         notes_file = root/'notes.md'; notes_file.write_text(notes)
@@ -55,7 +55,7 @@ def publish(tag, title, notes, files, root):
             if checksum(directory/path.name) != checksum(path):
                 raise ValueError('Authenticated upload verification failed')
             (directory/path.name).unlink()
-        gh('release', 'edit', tag, '--draft=false', '--prerelease')
+        gh('release', 'edit', tag, '--draft=false', '--prerelease', '--title', title, '--notes-file', str(notes_file))
     # End users never authenticate; require a full anonymous download, not just a HEAD request.
     for path in files:
         target = root/'anonymous-check'
@@ -131,6 +131,14 @@ def main():
                  'SHA256SUMSにチェックサムを記載しています。実機インストールは未確認です。\n\n'
                  'Source commit: '+manifest['source_commit']+'\n')
         publish(manifest['tag'], 'VoiceClone Android '+manifest['tag'].removeprefix('voiceclone-android-'), notes, [*files, sums], root)
+        if 'voiceclone.apk' in names and manifest.get('in_app_downloads'):
+            latest=root/'latest'; latest.mkdir()
+            shutil.copyfile(root/'voiceclone.apk', latest/'voiceclone.apk')
+            (latest/'SHA256SUMS').write_text(f'{checksum(latest/"voiceclone.apk")}  voiceclone.apk\n')
+            alias_notes=('最新版のVoiceClone（約35MB）。MF／RFモデルはアプリ内からログインなしで初回取得できます。\n\n'
+                         f'このビルドの履歴・チェックサム：https://github.com/{REPOSITORY}/releases/tag/{manifest["tag"]}\n')
+            publish('voiceclone-android-latest', 'VoiceClone Android — latest', alias_notes,
+                    [latest/'voiceclone.apk',latest/'SHA256SUMS'],root,rolling=True)
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
             summary.write(f'VoiceClone APK downloads: https://github.com/{REPOSITORY}/releases/tag/{manifest["tag"]}\n')
 
