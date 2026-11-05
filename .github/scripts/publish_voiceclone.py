@@ -117,11 +117,15 @@ def main():
         files = [root/name for name in names]
         sums = root/'SHA256SUMS'
         sums.write_text(''.join(f'{checksum(path)}  {path.name}\n' for path in files))
-        notes = ('VoiceClone Android（arm64）\n\n'
-                 '- voiceclone.apk：約35MBのアプリ本体。モデルはアプリ内で別途準備します。\n'
-                 '- voiceclone-mf.apk：約1.08GB。普段使いのMFモデルを同梱。\n'
-                 '- voiceclone-rf.apk：約1.08GB。比較用のRFモデルを同梱。\n'
-                 '- voiceclone-mf-rf.apk：約2.12GB。両モデルを同梱。\n'
+        descriptions = {
+            'voiceclone.apk': '約35MBのアプリ本体。'+('MF／RFをアプリ内からログインなしで初回取得できます。' if manifest.get('in_app_downloads') else 'このビルドは従来モデル・準備済みモデル向け。MF／RFの新規取得には最新の通常版をご利用ください。'),
+            'voiceclone-mf.apk': '約1.08GB。普段使いのMFモデルを同梱。',
+            'voiceclone-rf.apk': '約1.08GB。比較用のRFモデルを同梱。',
+            'voiceclone-mf-rf.apk': '約2.12GB。両モデルを同梱。',
+        }
+        notes = ('VoiceClone Android（arm64）\n\n'+
+                 ''.join(f'- **{name}**：{descriptions[name]}\n' for name in names)+
+                 '\n'
                  '同梱版では「モデル」→「アプリ内のモデルを準備」。上書き更新で声と準備済みモデルを保持します。\n'
                  'モデルの重みは同じです。APKの分割で音質・生成速度は変わりません。\n'
                  'SHA256SUMSにチェックサムを記載しています。実機インストールは未確認です。\n\n'
@@ -136,5 +140,9 @@ if __name__ == '__main__':
         main()
     except Exception as error:
         # Exceptions can include signed URLs. Keep temporary access parameters out of logs.
-        print(f'Publication failed ({type(error).__name__}); unpublished drafts are retained.', flush=True)
+        status=getattr(error, 'code', None)
+        if isinstance(error, subprocess.CalledProcessError):
+            match=re.search(r'HTTP (\d{3})', error.stderr or '')
+            status=match.group(1) if match else None
+        print(f'Publication failed ({type(error).__name__}, HTTP={status}); unpublished drafts are retained.', flush=True)
         raise SystemExit(1)
