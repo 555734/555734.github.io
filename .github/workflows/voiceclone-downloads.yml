@@ -1,0 +1,28 @@
+name: Publish VoiceClone downloads
+on:
+  repository_dispatch:
+    types: [voiceclone-release]
+  workflow_dispatch:
+    inputs:
+      transfer_manifest:
+        description: Verified APK transfer manifest
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: voiceclone-downloads
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify and publish APKs and model packs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/publish_voiceclone.py
